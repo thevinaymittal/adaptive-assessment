@@ -1,0 +1,4 @@
+question_text,question_type,difficulty_level,skill_focus,option_1,option_2,option_3,option_4,option_5,option_6,correct_answer,explanation
+"Choose the correct form: She ___ to school every day.",multiple_choice,A1,grammar,go,goes,going,gone,,,goes,Third person singular requires 's'
+"Complete: If I ___ rich, I would travel.",multiple_choice,B1,grammar,am,was,were,be,,,were,Second conditional uses 'were'
+"What does ubiquitous mean?",multiple_choice,C1,vocabulary,Rare,Omnipresent,Absent,Occasional,,,Omnipresent,Means present everywhere
