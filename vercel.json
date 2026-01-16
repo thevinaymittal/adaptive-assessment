@@ -1,0 +1,41 @@
+{
+  "version": 2,
+  "name": "adaptive-assessment",
+  "builds": [
+    {
+      "src": "api/assessment.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "api/validation.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/assessment/(.*)",
+      "dest": "api/assessment.py"
+    },
+    {
+      "src": "/api/validation/(.*)",
+      "dest": "api/validation.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "api/assessment.py"
+    }
+  ],
+  "env": {
+    "DB_HOST": "@db_host",
+    "DB_USER": "@db_user",
+    "DB_PASSWORD": "@db_password",
+    "DB_NAME": "@db_name",
+    "DB_PORT": "@db_port"
+  },
+  "functions": {
+    "api/**/*.py": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  }
+}

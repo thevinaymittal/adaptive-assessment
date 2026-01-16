@@ -1,0 +1,163 @@
+service: adaptive-assessment
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: python3.11
+  region: us-east-1
+  stage: ${opt:stage, 'prod'}
+  timeout: 30
+  memorySize: 512
+  
+  # Environment variables
+  environment:
+    DB_HOST: ${env:DB_HOST, 'localhost'}
+    DB_USER: ${env:DB_USER, 'root'}
+    DB_PASSWORD: ${env:DB_PASSWORD, ''}
+    DB_NAME: ${env:DB_NAME, 'language_school'}
+    DB_PORT: ${env:DB_PORT, '3306'}
+  
+  # IAM Role permissions
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - rds:*
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: "*"
+        - Effect: Allow
+          Action:
+            - s3:GetObject
+            - s3:PutObject
+          Resource: "arn:aws:s3:::${self:custom.bucketName}/*"
+
+  # API Gateway configuration
+  apiGateway:
+    shouldStartNameWithService: true
+    binaryMediaTypes:
+      - 'multipart/form-data'
+      - 'application/octet-stream'
+
+custom:
+  bucketName: adaptive-assessment-uploads-${self:provider.stage}
+  pythonRequirements:
+    dockerizePip: false
+    pythonBin: python3
+    slim: true
+    strip: false
+    layer: true
+    usePoetry: false
+    noDeploy:
+      - boto3
+      - botocore
+
+functions:
+  # Assessment API - Main endpoint
+  assessmentAPI:
+    handler: lambda_handler.assessment
+    timeout: 30
+    memorySize: 512
+    events:
+      - http:
+          path: /api/assessment/{proxy+}
+          method: ANY
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+            allowCredentials: false
+      - http:
+          path: /
+          method: GET
+          cors: true
+
+  # Validation API - Admin endpoint
+  validationAPI:
+    handler: lambda_handler.validation
+    timeout: 60
+    memorySize: 1024
+    events:
+      - http:
+          path: /api/validation/{proxy+}
+          method: ANY
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+            allowCredentials: false
+
+  # Scheduled calibration job (runs daily at 2 AM UTC)
+  dailyCalibration:
+    handler: lambda_handler.scheduled_calibration
+    timeout: 300
+    memorySize: 1024
+    events:
+      - schedule:
+          rate: cron(0 2 * * ? *)
+          enabled: true
+
+resources:
+  Resources:
+    # S3 Bucket for CSV uploads
+    UploadsBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.bucketName}
+        CorsConfiguration:
+          CorsRules:
+            - AllowedOrigins:
+                - '*'
+              AllowedMethods:
+                - GET
+                - PUT
+                - POST
+              AllowedHeaders:
+                - '*'
+              MaxAge: 3000
+
+    # RDS MySQL Database (optional - can use existing)
+    # Uncomment if you want serverless to create the database
+    # AssessmentDB:
+    #   Type: AWS::RDS::DBInstance
+    #   Properties:
+    #     Engine: mysql
+    #     EngineVersion: 8.0.35
+    #     DBInstanceClass: db.t3.micro
+    #     AllocatedStorage: 20
+    #     StorageType: gp2
+    #     DBName: tulkka_live
+    #     MasterUsername: ${env:DB_USER}
+    #     MasterUserPassword: ${env:DB_PASSWORD}
+    #     PubliclyAccessible: true
+    #     BackupRetentionPeriod: 7
+    #     DeletionProtection: false
+    #     Tags:
+    #       - Key: Name
+    #         Value: adaptive-assessment-db
+
+plugins:
+  - serverless-python-requirements
+  - serverless-offline
+
+package:
+  individually: false
+  patterns:
+    - '!node_modules/**'
+    - '!venv/**'
+    - '!.git/**'
+    - '!.pytest_cache/**'
+    - '!__pycache__/**'
+    - '!*.md'
+    - '!.env.example'
